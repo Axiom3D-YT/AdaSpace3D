@@ -249,6 +249,36 @@ function Setup-ShadowBuild {
     Write-Info "  - $USER_CONFIG"
 }
 
+
+============================================================
+ STEP 3.5 : Preparing the RP2040 Environment 🛠️
+============================================================
+
+Write-Host "[INFO] Ensuring the Raspberry Pi RP2040 platform is installed."
+
+# 1. Add the 3rd-party URL for the RP2040 platform index.
+# This makes the rp2040 core discoverable by the CLI.
+Write-Host "[INFO] 1/3: Adding board manager URL..."
+try {
+    arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json | Out-Null
+} catch {
+    Write-Host "[WARNING] Failed to add URL. It might already be present."
+}
+
+# 2. Update the local index to recognize the new URL.
+Write-Host "[INFO] 2/3: Updating board index..."
+arduino-cli core update-index
+
+# 3. Install the missing RP2040 platform core.
+# The 'rp2040:rp2040' is the required core package name.
+Write-Host "[INFO] 3/3: Installing RP2040 core (this may take a moment)..."
+arduino-cli core install rp2040:rp2040
+
+Write-Host "[INFO] RP2040 Platform Core is now installed and ready."
+
+---
+
+
 # ============================================================
 # STEP 4: Compile with Custom USB Descriptors
 # ============================================================
@@ -581,5 +611,6 @@ if ($key.Character -eq 'y' -or $key.Character -eq 'Y') {
         }
     }
 }
+
 
 Write-Host ""
