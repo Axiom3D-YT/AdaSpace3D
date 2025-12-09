@@ -276,7 +276,6 @@ arduino-cli core install rp2040:rp2040
 
 Write-Host "[INFO] RP2040 Platform Core is now installed and ready."
 
----
 
 
 # ============================================================
@@ -614,3 +613,4 @@ if ($key.Character -eq 'y' -or $key.Character -eq 'Y') {
 
 
 Write-Host ""
+
