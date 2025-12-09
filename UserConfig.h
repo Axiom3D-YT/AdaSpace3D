@@ -35,13 +35,13 @@
 
 // --- SENSOR SETTINGS ---
 // SENSITIVITY: 150.0 is the "Golden" value for this sensor
-#define CONFIG_TRANS_SCALE     150.0  
-#define CONFIG_ZOOM_SCALE      150.0  
-#define CONFIG_ROT_SCALE       150.0  
+#define CONFIG_TRANS_SCALE     100 
+#define CONFIG_ZOOM_SCALE      50  
+#define CONFIG_ROT_SCALE       40 
 
 // DEADZONES: Keep small (1.0) because raw values are tiny
 #define CONFIG_DEADZONE        1.0    
-#define CONFIG_ZOOM_DEADZONE   1.0    
+#define CONFIG_ZOOM_DEADZONE   2.5  
 
 // --- USB IDENTIFICATION ---
 // 0x046d / 0xc626 = SpaceNavigator (Best for DIY compatibility)
