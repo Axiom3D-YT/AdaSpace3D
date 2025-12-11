@@ -19,14 +19,17 @@ Your DIY build will now be recognized by Windows/macOS as a genuine **SpaceMouse
 * **Reactive Lighting:**
     * **Dual Drive:** Supports both Addressable (NeoPixel) and Standard LEDs simultaneously.
     * **Smart Feedback:** LED glows dim when idle and brightens as you move the knob.
-* **5DOF Navigation:** Smooth X, Y, Z translation + Pitch and Roll (Twist axis disabled by hardware physics limitations).
+* **5DOF Navigation:** Smooth X, Y, Z translation + Pitch and Roll.
 * **Bulletproof Flasher:** Includes a custom "One-Click" build script that handles libraries, compilers, and upload automatically.
+
+> [!IMPORTANT]
+> **Hardware Limitation:** Spin/Twist rotation is **not functional** due to the physics of the current sensor setup. For best results, configure your 3DConnexion driver to use either **Pan/Zoom** or **Rotation** mode—not both simultaneously. Use the programmable buttons to toggle between these modes on-the-fly.
 
 ---
 
 ## 🛠️ Hardware Support
 
-This firmware is designed for the **Adafruit QT Py RP2040**, but works on other RP2040 boards with minor pin changes.
+This firmware is designed for the **Adafruit QT Py RP2040**, but will possibly work on other RP2040 boards with possible minor pin changes.
 
 | Component | Pin (Default) | Notes |
 | :--- | :--- | :--- |
@@ -57,6 +60,9 @@ The script will automatically:
 * Install the RP2040 Core and Infineon Sensor libraries.
 * Compile the firmware with the correct "SpaceMouse" USB ID.
 * Detect the `RPI-RP2` drive and flash it instantly.
+
+> [!TIP]
+> For manual builds without the script (Linux/macOS/advanced users), see [ADVANCED-INSTRUCTIONS.md](ADVANCED-INSTRUCTIONS.md).
 
 ---
 
