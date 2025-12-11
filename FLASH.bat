@@ -13,7 +13,7 @@ cd /d "%~dp0"
 
 :: Launch PowerShell with execution policy bypass
 :: Using -Command and $PWD to get clean path without quote issues
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& { Set-Location -LiteralPath '%CD%'; & '.\builder.ps1' }"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\builder.ps1"
 
 :: Pause so the user can see success/error messages
 echo.

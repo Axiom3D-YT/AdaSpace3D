@@ -174,8 +174,12 @@ function Install-Dependencies {
     Write-Success "Core index updated!"
     
     # Install RP2040 core
+    # Install RP2040 core
     Write-Info "Installing RP2040 core..."
-    & $ARDUINO_CLI core install rp2040:rp2040 2>&1 | Out-Null
+    & $ARDUINO_CLI core install rp2040:rp2040
+    if ($LASTEXITCODE -ne 0) {
+        Exit-WithError "Failed to install RP2040 core. Please check your internet connection."
+    }
     Write-Success "RP2040 core installed!"
     
     # List of required libraries
