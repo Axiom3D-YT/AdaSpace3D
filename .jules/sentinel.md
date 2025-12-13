@@ -1,0 +1,4 @@
+## 2024-05-23 - Unverified Binary Download in Build Script
+**Vulnerability:** The `builder.ps1` script downloaded `arduino-cli.zip` from GitHub and executed it without verifying its integrity. This created a supply chain vulnerability where a compromised download (via DNS spoofing or compromised release) could execute arbitrary code on the user's machine.
+**Learning:** Build scripts that download dependencies are often overlooked as attack vectors. Simply downloading over HTTPS is not enough to guarantee integrity, especially for executable binaries.
+**Prevention:** Always verify SHA256 checksums of downloaded binaries against a known good value before execution. Implement "Trust On First Use" (TOFU) pinning if an official checksum file is not available, but prefer official signatures where possible.

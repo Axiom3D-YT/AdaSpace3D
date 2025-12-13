@@ -17,6 +17,7 @@ $ScriptRoot = Get-Location | Select-Object -ExpandProperty Path
 # ============================================================
 $ARDUINO_CLI_VERSION = "1.1.1"
 $ARDUINO_CLI_URL = "https://github.com/arduino/arduino-cli/releases/download/v$ARDUINO_CLI_VERSION/arduino-cli_${ARDUINO_CLI_VERSION}_Windows_64bit.zip"
+$ARDUINO_CLI_CHECKSUM = "f49a61865ff5d91d2732a19c51b0ac767cce51213db84b0b28b98ee070879f66"
 
 $TOOLS_DIR = [System.IO.Path]::Combine($ScriptRoot, "tools")
 $ARDUINO_CLI = [System.IO.Path]::Combine($TOOLS_DIR, "arduino-cli.exe")
@@ -86,10 +87,10 @@ function Exit-WithError {
 # ============================================================
 function Ensure-ArduinoCLI {
     Write-Step "1" "Checking Arduino CLI"
-    
+
     if ([System.IO.File]::Exists($ARDUINO_CLI)) {
         Write-Success "Arduino CLI found at: $ARDUINO_CLI"
-        
+
         # Verify it works
         try {
             $version = & $ARDUINO_CLI version 2>&1
@@ -100,33 +101,42 @@ function Ensure-ArduinoCLI {
             [System.IO.File]::Delete($ARDUINO_CLI)
         }
     }
-    
+
     if (-not [System.IO.File]::Exists($ARDUINO_CLI)) {
         Write-Info "Arduino CLI not found. Downloading portable version..."
-        
+
         # Create tools directory
         if (-not [System.IO.Directory]::Exists($TOOLS_DIR)) {
             [System.IO.Directory]::CreateDirectory($TOOLS_DIR) | Out-Null
             Write-Info "Created tools directory: $TOOLS_DIR"
         }
-        
+
         $zipPath = [System.IO.Path]::Combine($TOOLS_DIR, "arduino-cli.zip")
-        
+
         Write-Info "Downloading from: $ARDUINO_CLI_URL"
         try {
             # Use TLS 1.2 for GitHub
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            
+
             $ProgressPreference = 'SilentlyContinue'  # Speeds up download significantly
             Invoke-WebRequest -Uri $ARDUINO_CLI_URL -OutFile $zipPath -UseBasicParsing
             $ProgressPreference = 'Continue'
-            
+
             Write-Success "Download complete!"
+
+            # Verify Checksum
+            Write-Info "Verifying checksum..."
+            $hash = Get-FileHash $zipPath -Algorithm SHA256
+            if ($hash.Hash -ne $ARDUINO_CLI_CHECKSUM.ToUpper()) {
+                [System.IO.File]::Delete($zipPath)
+                Exit-WithError "Checksum mismatch! Expected $ARDUINO_CLI_CHECKSUM but got $($hash.Hash). Deleted file for safety."
+            }
+            Write-Success "Checksum verified!"
         }
         catch {
             Exit-WithError "Failed to download Arduino CLI: $_"
         }
-        
+
         Write-Info "Extracting Arduino CLI..."
         try {
             Expand-Archive -LiteralPath $zipPath -DestinationPath $TOOLS_DIR -Force
@@ -135,16 +145,16 @@ function Ensure-ArduinoCLI {
         catch {
             Exit-WithError "Failed to extract Arduino CLI: $_"
         }
-        
+
         # Clean up zip file
         if ([System.IO.File]::Exists($zipPath)) {
             [System.IO.File]::Delete($zipPath)
         }
-        
+
         if (-not [System.IO.File]::Exists($ARDUINO_CLI)) {
             Exit-WithError "Arduino CLI extraction failed - executable not found!"
         }
-        
+
         Write-Success "Arduino CLI installed successfully!"
     }
 }
@@ -154,25 +164,25 @@ function Ensure-ArduinoCLI {
 # ============================================================
 function Install-Dependencies {
     Write-Step "2" "Installing Dependencies"
-    
+
     # --- CRITICAL FIX: Add Third-Party Board URL ---
     # We must tell Arduino CLI where to find the RP2040 core
     $EARLE_URL = "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
-    
+
     # Initialize config if missing
     if (-not (Test-Path "$TOOLS_DIR\arduino-cli.yaml")) {
         & $ARDUINO_CLI config init --dest-dir "$TOOLS_DIR" | Out-Null
     }
-    
+
     Write-Info "Configuring Board Manager..."
     # We use 'set' to ensure it's there
     & $ARDUINO_CLI config set board_manager.additional_urls $EARLE_URL | Out-Null
-    
+
     # Update core index
     Write-Info "Updating Arduino core index..."
     & $ARDUINO_CLI core update-index 2>&1 | Out-Null
     Write-Success "Core index updated!"
-    
+
     # Install RP2040 core
     # Install RP2040 core
     Write-Info "Installing RP2040 core..."
@@ -181,12 +191,12 @@ function Install-Dependencies {
         Exit-WithError "Failed to install RP2040 core. Please check your internet connection."
     }
     Write-Success "RP2040 core installed!"
-    
+
     # List of required libraries
     $libs = @(
         "Adafruit TinyUSB Library",
         "XENSIV 3D Magnetic Sensor TLx493D",
-        "Adafruit NeoPixel" 
+        "Adafruit NeoPixel"
     )
 
     foreach ($lib in $libs) {
@@ -208,29 +218,29 @@ function Install-Dependencies {
 # ============================================================
 function Setup-ShadowBuild {
     Write-Step "3" "Setting Up Shadow Build"
-    
+
     $sourceSketch = [System.IO.Path]::Combine($ScriptRoot, $MAIN_SKETCH)
     $sourceConfig = [System.IO.Path]::Combine($ScriptRoot, $USER_CONFIG)
-    
+
     # Validate source files exist
     if (-not [System.IO.File]::Exists($sourceSketch)) {
         Exit-WithError "Main sketch not found: $sourceSketch"
     }
-    
+
     if (-not [System.IO.File]::Exists($sourceConfig)) {
         Exit-WithError "User config not found: $sourceConfig"
     }
-    
+
     Write-Info "Source files validated!"
-    
+
     # Clean and create build temp directory
     if ([System.IO.Directory]::Exists($BUILD_TEMP)) {
         Write-Info "Cleaning previous build directory..."
-        
+
         # Try multiple methods to delete, with retries
         $maxRetries = 3
         $deleted = $false
-        
+
         for ($i = 1; $i -le $maxRetries; $i++) {
             try {
                 # Use PowerShell's Remove-Item which handles more cases
@@ -249,20 +259,20 @@ function Setup-ShadowBuild {
             }
         }
     }
-    
+
     # Create the shadow build directory with correct name
     if (-not [System.IO.Directory]::Exists($SKETCH_BUILD_DIR)) {
         [System.IO.Directory]::CreateDirectory($SKETCH_BUILD_DIR) | Out-Null
     }
     Write-Info "Created shadow build directory: $SKETCH_BUILD_DIR"
-    
+
     # Copy source files
     $destSketch = [System.IO.Path]::Combine($SKETCH_BUILD_DIR, $MAIN_SKETCH)
     $destConfig = [System.IO.Path]::Combine($SKETCH_BUILD_DIR, $USER_CONFIG)
-    
+
     [System.IO.File]::Copy($sourceSketch, $destSketch, $true)
     [System.IO.File]::Copy($sourceConfig, $destConfig, $true)
-    
+
     Write-Success "Source files copied to shadow build directory!"
     Write-Info "  - $MAIN_SKETCH"
     Write-Info "  - $USER_CONFIG"
@@ -273,28 +283,28 @@ function Setup-ShadowBuild {
 # ============================================================
 function Compile-Firmware {
     Write-Step "4" "Compiling Firmware"
-    
+
     $sketchPath = $SKETCH_BUILD_DIR
     $outputDir = [System.IO.Path]::Combine($BUILD_TEMP, "output")
-    
-    Write-Info "Board: $BOARD_FQBN" 
+
+    Write-Info "Board: $BOARD_FQBN"
     Write-Info "Injecting USB ID: $USB_VID / $USB_PID"
-    
+
     # Build a proper argument list
     $fqbn = "${BOARD_FQBN}:usbstack=$USB_STACK"
-    
+
     # --- FIXED FLAGS FOR COMPILER ---
     # We now rely on standard build properties which the RP2040 core handles natively.
-    
+
     $propVid       = "build.vid=$USB_VID"
     $propPid       = "build.pid=$USB_PID"
     $propUsbVid    = "build.usbvid=-DUSBD_VID=$USB_VID"
     $propUsbPid    = "build.usbpid=-DUSBD_PID=$USB_PID"
-    
+
     # Careful quoting for properties with spaces
     $propProduct   = "build.usb_product=\`"$USB_PRODUCT\`""
     $propMfg       = "build.usb_manufacturer=\`"$USB_MANUFACTURER\`""
-    
+
     # Build the argument string manually to handle paths with spaces correctly
     $argString = "compile --fqbn `"$fqbn`" " +
     "--build-property `"$propVid`" " +
@@ -305,7 +315,7 @@ function Compile-Firmware {
     "--build-property `"$propMfg`" " +
     "--output-dir `"$outputDir`" " +
     "`"$sketchPath`""
-    
+
     # Start the compile process with async output capture
     $pinfo = New-Object System.Diagnostics.ProcessStartInfo
     $pinfo.FileName = $ARDUINO_CLI
@@ -314,32 +324,32 @@ function Compile-Firmware {
     $pinfo.RedirectStandardError = $true
     $pinfo.UseShellExecute = $false
     $pinfo.WorkingDirectory = $ScriptRoot
-    
+
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $pinfo
-    
+
     # Use StringBuilder to collect output asynchronously
     $stdoutBuilder = New-Object System.Text.StringBuilder
     $stderrBuilder = New-Object System.Text.StringBuilder
-    
+
     # Register event handlers for async reading
     $stdoutEvent = Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action {
         if ($EventArgs.Data) { $Event.MessageData.AppendLine($EventArgs.Data) | Out-Null }
     } -MessageData $stdoutBuilder
-    
+
     $stderrEvent = Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -Action {
         if ($EventArgs.Data) { $Event.MessageData.AppendLine($EventArgs.Data) | Out-Null }
     } -MessageData $stderrBuilder
-    
+
     $process.Start() | Out-Null
     $process.BeginOutputReadLine()
     $process.BeginErrorReadLine()
-    
+
     # Animated spinner while compiling
     $spinner = @('|', '/', '-', '\')
     $spinIdx = 0
     $startTime = Get-Date
-    
+
     Write-Host ""
     while (-not $process.HasExited) {
         $elapsed = ((Get-Date) - $startTime).TotalSeconds
@@ -348,23 +358,23 @@ function Compile-Firmware {
         $spinIdx++
         Start-Sleep -Milliseconds 150
     }
-    
+
     # Wait for async reads to complete
     $process.WaitForExit()
     Start-Sleep -Milliseconds 100
-    
+
     # Cleanup event handlers
     Unregister-Event -SourceIdentifier $stdoutEvent.Name
     Unregister-Event -SourceIdentifier $stderrEvent.Name
-    
+
     # Clear the spinner line
     Write-Host "`r                                        `r" -NoNewline
-    
+
     $stdout = $stdoutBuilder.ToString()
     $stderr = $stderrBuilder.ToString()
-    
+
     $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
-    
+
     if ($process.ExitCode -ne 0) {
         Write-Host ""
         Write-Error-Custom "Compilation failed! (${elapsed}s)"
@@ -373,22 +383,22 @@ function Compile-Firmware {
         if ($stdout) { Write-Host $stdout -ForegroundColor Gray }
         exit 1
     }
-    
+
     # Verify UF2 file was created
     if (-not [System.IO.Directory]::Exists($outputDir)) {
         Exit-WithError "Output directory not created - compilation may have failed!"
     }
-    
+
     $uf2Files = [System.IO.Directory]::GetFiles($outputDir, "*.uf2")
-    
+
     if ($uf2Files.Count -eq 0) {
         Exit-WithError "Compilation succeeded but UF2 file not found in output directory!"
     }
-    
+
     $uf2File = Get-Item -LiteralPath $uf2Files[0]
-    
+
     Write-Success "Compiled in ${elapsed}s ($([math]::Round($uf2File.Length / 1024, 2)) KB)"
-    
+
     return $uf2File.FullName
 }
 
@@ -397,13 +407,13 @@ function Compile-Firmware {
 # ============================================================
 function Flash-Firmware {
     param([string]$UF2Path)
-    
+
     Write-Step "5" "Flashing Firmware"
-    
+
     if (-not [System.IO.File]::Exists($UF2Path)) {
         Exit-WithError "UF2 file not found: $UF2Path"
     }
-    
+
     function Find-BootloaderDrive {
         $drives = Get-WmiObject Win32_Volume | Where-Object { $_.Label -eq "RPI-RP2" }
         if ($drives) {
@@ -411,13 +421,13 @@ function Flash-Firmware {
         }
         return $null
     }
-    
+
     function Copy-ToBootloader {
         param([string]$DriveLetter, [string]$SourceFile)
-        
+
         $fileName = [System.IO.Path]::GetFileName($SourceFile)
         $destPath = [System.IO.Path]::Combine($DriveLetter, $fileName)
-        
+
         Write-Info "Copying firmware to $DriveLetter..."
         try {
             [System.IO.File]::Copy($SourceFile, $destPath, $true)
@@ -429,14 +439,14 @@ function Flash-Firmware {
             return $false
         }
     }
-    
+
     # First attempt to find the bootloader drive
     $bootDrive = Find-BootloaderDrive
-    
+
     if ($bootDrive) {
         Write-Info "Found RP2040 bootloader at: $bootDrive"
         $success = Copy-ToBootloader -DriveLetter $bootDrive -SourceFile $UF2Path
-        
+
         if ($success) {
             Write-Host ""
             Write-Host "============================================================" -ForegroundColor Green
@@ -458,16 +468,16 @@ function Flash-Firmware {
         Write-Host ""
         Write-Host "  A new drive called 'RPI-RP2' should appear." -ForegroundColor Yellow
         Write-Host ""
-        
+
         Read-Host "Press Enter when ready to try again"
-        
+
         # Second attempt
         $bootDrive = Find-BootloaderDrive
-        
+
         if ($bootDrive) {
             Write-Info "Found RP2040 bootloader at: $bootDrive"
             $success = Copy-ToBootloader -DriveLetter $bootDrive -SourceFile $UF2Path
-            
+
             if ($success) {
                 Write-Host ""
                 Write-Host "============================================================" -ForegroundColor Green
@@ -506,19 +516,19 @@ Write-Host ""
 try {
     # Step 1: Ensure Arduino CLI is available
     Ensure-ArduinoCLI
-    
+
     # Step 2: Install dependencies
     Install-Dependencies
-    
+
     # Step 3: Set up shadow build directory
     Setup-ShadowBuild
-    
+
     # Step 4: Compile firmware
     $uf2Path = Compile-Firmware
-    
+
     # Step 5: Flash to device
     Flash-Firmware -UF2Path $uf2Path
-    
+
 }
 catch {
     Write-Host ""
@@ -532,5 +542,3 @@ Write-Host "============================================================" -Foreg
 Write-Host " BUILD PROCESS COMPLETE" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host ""
-
-
