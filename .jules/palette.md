@@ -1,0 +1,3 @@
+## 2024-05-22 - Configuration Clarity
+**Learning:** For maker/DIY projects, the configuration file IS the primary user interface. Ambiguous comments and conflicting default values create immediate friction and lack of trust in the firmware.
+**Action:** Treat configuration files as documentation. Use clear section headers, explain values in plain English, and ensure comments strictly match the code values. Provide "cheat sheets" (like color palettes) directly in the config file.
